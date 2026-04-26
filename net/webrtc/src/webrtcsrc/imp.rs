@@ -336,6 +336,7 @@ struct SignallerSignals {
     error: glib::SignalHandlerId,
     session_started: glib::SignalHandlerId,
     session_ended: glib::SignalHandlerId,
+    shutdown: glib::SignalHandlerId,
     request_meta: glib::SignalHandlerId,
     session_description: glib::SignalHandlerId,
     handle_ice: glib::SignalHandlerId,
@@ -1749,6 +1750,15 @@ impl BaseWebRTCSrc {
                         move |_signaller: glib::Object, _session_id: &str| {
                             let this = instance.imp();
 
+                            if this.state.lock().unwrap().session.is_none() {
+                                gst::debug!(
+                                    CAT,
+                                    imp = this,
+                                    "Ignoring session-ended with no current session"
+                                );
+                                return true;
+                            }
+
                             if let Err(e) = this.remove_session() {
                                 gst::error!(
                                     CAT,
@@ -1779,6 +1789,18 @@ impl BaseWebRTCSrc {
                             session.0.lock().unwrap().generate_offer(&this.obj());
                         }
                     }),
+                ),
+
+                shutdown: signaller.connect_closure(
+                    "shutdown",
+                    false,
+                    glib::closure!(
+                        #[watch]
+                        instance,
+                        move |_signaller: glib::Object| {
+                            instance.imp().end_stream();
+                        }
+                    ),
                 ),
 
                 request_meta: signaller.connect_closure(
@@ -2155,6 +2177,25 @@ impl BaseWebRTCSrc {
         }
 
         Ok(())
+    }
+
+    fn end_stream(&self) {
+        let obj = self.obj();
+        gst::info!(CAT, imp = self, "Shutting down session and sending EOS");
+
+        let src_pads = obj.src_pads();
+        if src_pads.is_empty() {
+            gst::info!(CAT, imp = self, "No source pads, posting EOS");
+            obj.no_more_pads();
+            let _ = obj.post_message(gst::message::Eos::builder().src(&*obj).build());
+        } else {
+            for pad in src_pads.iter() {
+                gst::info!(CAT, imp = self, "Sending EOS on pad {}", pad.name());
+                if !pad.push_event(gst::event::Eos::new()) {
+                    gst::warning!(CAT, imp = self, "Failed to push EOS on {}", pad.name());
+                }
+            }
+        }
     }
 }
 
