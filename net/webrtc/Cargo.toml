@@ -1,6 +1,6 @@
 [package]
 name = "gst-plugin-webrtc"
-version = "0.15.1-onkol.2"
+version = "0.15.1-onkol.3"
 edition.workspace = true
 authors = ["Mathieu Duponchelle <mathieu@centricular.com>", "Thibault Saunier <tsaunier@igalia.com>"]
 license = "MPL-2.0"

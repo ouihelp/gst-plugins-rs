@@ -1,6 +1,6 @@
 # gst-plugins-rs wheel
 
-This Python wheel packages the patched `rswebrtc` GStreamer plugin for OuiHelp local development.
+This Python wheel packages the `rswebrtc` GStreamer plugin for OuiHelp local development.
 
 Typical usage:
 
