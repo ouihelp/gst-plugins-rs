@@ -1,0 +1,38 @@
+[project]
+name = "gst-plugins-rs"
+version = "0.15.1.post1"
+description = "OuiHelp-packaged rswebrtc GStreamer plugin for local development"
+authors = [{ name = "OuiHelp Engineering", email = "tech@ouihelp.fr" }]
+requires-python = ">=3.11"
+
+[project.urls]
+Repository = "https://github.com/ouihelp/gst-plugins-rs"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+gst_plugins_rs = [
+    "lib/gstreamer-1.0/*.dylib",
+    "lib/gstreamer-1.0/*.so",
+    "lib/gstreamer-1.0/*.dll",
+    "lib/gstreamer-1.0/.gitignore",
+]
+
+[tool.uv]
+required-version = ">=0.5.25"
+package = true
+
+[[tool.uv.index]]
+name = "engineering-artifacts"
+url = "https://ouihelp-202878675042.d.codeartifact.eu-west-3.amazonaws.com/pypi/engineering-artifacts/simple/"
+publish-url = "https://ouihelp-202878675042.d.codeartifact.eu-west-3.amazonaws.com/pypi/engineering-artifacts/"
+explicit = true

@@ -1,0 +1,61 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Build and publish wheel to AWS CodeArtifact
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Homebrew GStreamer dependencies
+        run: |
+          brew update
+          brew install pkg-config gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad
+
+      - name: Build rswebrtc plugin
+        run: |
+          export HOMEBREW_PREFIX="$(brew --prefix)"
+          export PKG_CONFIG_PATH="$HOMEBREW_PREFIX/lib/pkgconfig:$HOMEBREW_PREFIX/share/pkgconfig"
+          cargo build -p gst-plugin-webrtc --release --target aarch64-apple-darwin
+
+      - name: Prepare wheel contents
+        run: python3 python/scripts/prepare_wheel.py
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build wheel
+        run: cd python && uv build --wheel
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: "arn:aws:iam::202878675042:role/github-actions-engineering-artifacts-codeartifact"
+          role-session-name: GithubActions-gst-plugins-rs-${{ github.run_id }}
+          aws-region: eu-west-3
+
+      - name: Get CodeArtifact token
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ouihelp \
+            --domain-owner 202878675042 \
+            --region eu-west-3 \
+            --query authorizationToken \
+            --output text)
+          echo "UV_PUBLISH_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: Publish to CodeArtifact
+        run: cd python && uv publish --index engineering-artifacts dist/*
