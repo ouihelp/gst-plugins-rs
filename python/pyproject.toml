@@ -1,6 +1,6 @@
 [project]
 name = "gst-plugins-rs"
-version = "0.15.1.post1"
+version = "0.15.1.post2"
 description = "OuiHelp-packaged rswebrtc GStreamer plugin for local development"
 authors = [{ name = "OuiHelp Engineering", email = "tech@ouihelp.fr" }]
 requires-python = ">=3.11"
@@ -24,7 +24,6 @@ gst_plugins_rs = [
     "lib/gstreamer-1.0/*.dylib",
     "lib/gstreamer-1.0/*.so",
     "lib/gstreamer-1.0/*.dll",
-    "lib/gstreamer-1.0/.gitignore",
 ]
 
 [tool.uv]

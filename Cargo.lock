@@ -5138,7 +5138,7 @@ dependencies = [
 
 [[package]]
 name = "gst-plugin-webrtc"
-version = "0.15.1-onkol.1"
+version = "0.15.1-onkol.2"
 dependencies = [
  "anyhow",
  "async-tungstenite",

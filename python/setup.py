@@ -1,5 +1,9 @@
 from setuptools import setup
-from wheel.bdist_wheel import bdist_wheel
+
+try:
+    from setuptools.command.bdist_wheel import bdist_wheel
+except ImportError:  # pragma: no cover
+    from wheel.bdist_wheel import bdist_wheel
 
 
 class PlatformWheel(bdist_wheel):
