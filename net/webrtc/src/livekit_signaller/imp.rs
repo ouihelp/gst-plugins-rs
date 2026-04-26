@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::LazyLock;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -75,7 +74,6 @@ pub struct Signaller {
     join_canceller: Mutex<Option<futures::future::AbortHandle>>,
     signal_task_canceller: Mutex<Option<futures::future::AbortHandle>>,
     room_timeout_task_canceller: Mutex<Option<futures::future::AbortHandle>>,
-    graceful_shutdown: AtomicBool,
 }
 
 struct Channels {
@@ -125,13 +123,6 @@ impl Signaller {
     fn raise_error(&self, msg: String) {
         self.obj()
             .emit_by_name::<()>("error", &[&format!("Error: {msg}")]);
-    }
-
-    fn is_graceful_shutdown_reason(reason: proto::DisconnectReason) -> bool {
-        matches!(
-            reason,
-            proto::DisconnectReason::RoomDeleted | proto::DisconnectReason::RoomClosed
-        )
     }
 
     fn role(&self) -> Option<WebRTCSignallerRole> {
@@ -237,11 +228,7 @@ impl Signaller {
                     }
                     signal_client::SignalEvent::Close(reason) => {
                         gst::debug!(CAT, imp = self, "Close: {reason}");
-                        if self.graceful_shutdown.load(Ordering::SeqCst) {
-                            gst::debug!(CAT, imp = self, "Ignoring close after graceful shutdown");
-                        } else {
-                            self.raise_error("Server disconnected".to_string());
-                        }
+                        self.raise_error("Server disconnected".to_string());
                         break;
                     }
                 },
@@ -348,12 +335,6 @@ impl Signaller {
 
             proto::signal_response::Message::Leave(leave) => {
                 gst::debug!(CAT, imp = self, "Leave: {:?}", leave);
-                if Self::is_graceful_shutdown_reason(leave.reason()) {
-                    self.graceful_shutdown.store(true, Ordering::SeqCst);
-                    self.obj()
-                        .emit_by_name::<bool>("session-ended", &[&"unique"]);
-                    self.obj().emit_by_name::<()>("shutdown", &[]);
-                }
             }
 
             _ => {}
@@ -739,7 +720,6 @@ impl Signaller {
 impl SignallableImpl for Signaller {
     fn start(&self) {
         gst::debug!(CAT, imp = self, "Connecting");
-        self.graceful_shutdown.store(false, Ordering::SeqCst);
 
         let wsurl = if let Some(wsurl) = &self.settings.lock().unwrap().wsurl {
             wsurl.clone()
@@ -969,8 +949,6 @@ impl SignallableImpl for Signaller {
     }
 
     fn stop(&self) {
-        let graceful_shutdown = self.graceful_shutdown.swap(false, Ordering::SeqCst);
-
         if let Some(canceller) = &*self.join_canceller.lock().unwrap() {
             canceller.abort();
         }
@@ -985,11 +963,7 @@ impl SignallableImpl for Signaller {
         if let Some(connection) = connection {
             RUNTIME.block_on(async {
                 connection.signal_task.await.unwrap();
-                if graceful_shutdown {
-                    connection.signal_client.close().await;
-                } else {
-                    Self::close_signal_client(&connection.signal_client).await;
-                }
+                Self::close_signal_client(&connection.signal_client).await;
             });
         }
         self.obj().notify("connection-state");
